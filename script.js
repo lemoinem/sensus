@@ -999,10 +999,10 @@ function locateSequences(dec, zero, one, firstHeaderPos, header) {   // _input r
 							check ++
 						}
 					}
-					if (check = header.length) {                 // If all headers check have passed
+					if (check == header.length) {                 // If all headers check have passed
 						seqStart[index] = i;
 						index ++;
-						i = i + header.length;
+						i = i + header.length - 1;
 					}
 				}
 			}
