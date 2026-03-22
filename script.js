@@ -651,6 +651,11 @@ function readRaw() {                                        // * Main Raw analys
 			lastShiftR = sequence.shiftR;                                     //  in case the last sequence that will be read would return an empty object
 			lastBin = sequence.bin;                                           // 
 			lastHex = formatShort(sequence.hex, 4, 8);                        // 
+
+			// Re-inject dropped remainder bits dynamically
+			if (lastShiftR > 0) {
+				lastHex += " /" + binCommand[i].slice(-lastShiftR);
+			}
 			lastShort = formatShort(sequence.short, 0, 4);                    // 
 			lastCommand = seqCommand[i];                                      // Also stores identified rough hex commands[]
 			lastPtrail = str.at(-1 - trailerLength);
@@ -1065,15 +1070,15 @@ function payloadRead(seq, zero, one, maxGapInFrame = 10000) {         // _input:
 	return command;
 }
 function hexCommand(binCommand) {                                    // _input: '101001101011001011000100...' output : 'a6b2c4...'
-	let len = binCommand.length / 8;
+	let fullBytes = Math.floor(binCommand.length / 8);
 	let hex = '';
-	if (len >= 1) {
-		for (let i = 0; i < len; i ++) {	
-			hex += parseInt(binCommand.substring(i*8,i*8+8),2).toString(16);
+	if (fullBytes >= 1) {
+		for (let i = 0; i < fullBytes; i ++) {
+			hex += parseInt(binCommand.substring(i*8,i*8+8),2).toString(16).padStart(2, '0');
 		}
 	}
-	if (len != Math.round(len)) {                                      // if length is not a multiple of 8
-		hex += " /" + binCommand.substring(Math.round(len)*8,len *8);  // returns exceeding bits as 'a6b2c4 /010110'
+	if (binCommand.length % 8 !== 0) {                                      // if length is not a multiple of 8
+		hex += " /" + binCommand.substring(fullBytes*8);  // returns exceeding bits as 'a6b2c4 /010110'
 	}
 	return hex;
 }
@@ -2090,16 +2095,23 @@ function buildRaw(header,one,zero,ptrail,gap,bin) {      // Generates Raw from L
 	str[1] = cleanStringSeps(one, ',');                       // while cleaning separators in the three fields that have multiple values
 	header = cleanStringSeps(header, ',');                    //
 	
-	if (header) {raw.push(header)};
+	let val0 = str[0].split(',')[0];                          // Base pulse timing
+	let val1 = str[1].split(',')[1] || val0;                  // Base long space timing
 
-	for (i = 0; i < bin.length; i++) {              // IR Payload (can't use 'i in bin' here as i needs to be numerical)
-		raw.push(str[parseInt(bin.charAt(i))]);     // Pushes zero or one string
-		if (!((i+1) % 32)) {						// Pushes a ptrail every 32 bits (bit 0 will always be skipped as test starts at i+1) 
-			if (ptrail) {raw.push(ptrail)};         // 
-			if (bin.length > i +1) {
-				if (header) {raw.push(header)};     // Pushes header at the end (if length is a multiple of 32)
-			}
+	let parts = bin.split('/');
+	let necBits = parts[0];
+	let rawRem = parts[1] || "";
+
+	if (header) {raw.push(header)};
+	for (let i = 0; i < necBits.length; i++) {
+		raw.push(str[parseInt(necBits.charAt(i))]);
+	}
+	if (rawRem) {
+		for (let i = 0; i < rawRem.length; i++) {
+			raw.push(rawRem.charAt(i) === '0' ? val0 : val1);
 		}
+	} else if (ptrail) {
+		raw.push(ptrail);
 	}
 	if (gap) {raw.push(gap)};                       // Completes by pushing gap
 
@@ -2168,15 +2180,15 @@ function base64ToHex(str) {                              // _Converts Base 64 ==
 function hexTobin(hex) {                                 // Converts hex string to binary with 16 0-padding
 	//                                                                 Examples:
 	let bin = "";                                                   //  a5               -> 0000000010100101
-	let tmphex;                                                     //  a55a + d926 f50a -> 101001010101101011011001001001101111010100001010
-	//
-	hex = hex.replace(/[+]| /g, '');                                // Removes spaces and + signs if any
-	//
-	while (hex.length) {                                            // JS fails with long hex strings, max length seems to be 12 chars 
-		tmphex = "0x" + hex.slice(-4);                                  // Slices Hex number in 4-chars hex slices / 16 bits
-		bin = parseInt(tmphex).toString(2).padStart(16,"0") + bin;
-		hex = hex.substring(0,hex.length - 4);
+	let parts = hex.split('/');
+	let f = parts[0].replace(/[ \r\n+]/g, '');
+	let remainder = parts[1] ? parts[1].replace(/[ \r\n]/g, '') : "";
+	while (f.length) {
+		let tmphex = "0x" + f.slice(-4);
+		bin = parseInt(tmphex).toString(2).padStart(16, "0") + bin;
+		f = f.substring(0, f.length - 4);
 	}
+	if (remainder) bin += "/" + remainder; // Preserve the slash for buildRaw
 	return bin;
 }
 function hexPairPad(val) {                               // Converts a decimal to hex, adding 0 padding to get paired representation
