@@ -56,6 +56,7 @@ function ui_clear(fieldId) {               // Clears field with id string fieldI
 		clrField('cZeroField');
 		clrField('cPtrailField');
 		clrField('cGapField');
+		clrField('cMaxGapInFrameField');
 		clrField('cFreqField');
 		clrField('cShortField');
 		clrField('cCommandField');
@@ -142,7 +143,8 @@ function ui_presetValues() {			   // Prefills Command fields with most common IR
         "562, 563",     // Zero
         "1688",         // Ptrail
         "9000",         // Gap
-        ""      		// Pre Data
+        "",      	// Pre Data
+	"10000",	// Max Gap in Frame
     ];
 
     document.getElementById('cHeaderField').value = presetValues[0];
@@ -151,6 +153,7 @@ function ui_presetValues() {			   // Prefills Command fields with most common IR
     document.getElementById('cPtrailField').value = presetValues[3];
     document.getElementById('cGapField').value = presetValues[4];
     document.getElementById('cPreField').value = presetValues[5];
+    document.getElementById('cMaxGapInFrameField').value = presetValues[6];
 
     info("Preset values applied!");
 }
@@ -572,6 +575,7 @@ function readRaw() {                                        // * Main Raw analys
 	let i, seqStart, sequence;
 	let headerLength = parseInt(getField('headerLength'));
 	let trailerLength = parseInt(getField('trailerLength'));           // 
+	let maxGapInFrame = parseInt(getField('cMaxGapInFrameField')) || 10000;   // Read Max Gap in Frame from Commands UI
 	let raw = getField('rawField');
 	if (raw.length < 8) {return false};                                // Assume smallest string accepted is one stripped byte
 	let str = raw.split(',').map(Number);                              // String of comma-separated values ==> integer array
@@ -593,9 +597,9 @@ function readRaw() {                                        // * Main Raw analys
 		headerLength = header.length;                                 // *** Replaces user-defined header length if a header has been identified***
 		output += 'Header: ' + header.join(',');
 		output += ' @pos. ' + firstHeaderPos + ' / ';
-		seqStart = locateSequences(str, zero, one, firstHeaderPos, header);
+		seqStart = locateSequences(str, zero, one, firstHeaderPos, header, maxGapInFrame);
 	} else {
-		seqStart = locateSequences(str, zero, one, 0, -1);
+		seqStart = locateSequences(str, zero, one, 0, -1, maxGapInFrame);
 	}
 	output += 'Sequences: ' + (seqStart.length - 1)
 	output += ' - positions: ' + seqStart.toString() + ' / ';
@@ -622,9 +626,13 @@ function readRaw() {                                        // * Main Raw analys
 		//                                                              Function could be optimized by not re-running hexCommand() & searchBibits()
 		//                                                              when binCommand == previous binCommand, but keep as is for readability
 
-		seq = str.slice(seqStart[i] + headerLength,                      // i.e. seq = '75,549,549,275,275,549,549,275,275,549,275'
+		let curHeadLen = 0;
+		if (header == -1 || (header != -1 && is(str[seqStart[i]], header[0]))) {
+			curHeadLen = headerLength;
+		}
+		seq = str.slice(seqStart[i] + curHeadLen,                      // i.e. seq = '75,549,549,275,275,549,549,275,275,549,275'
 			seqStart[i+1] + 1 - trailerLength);		                     // +1 because slice excludes last, - trailerLength' as search parses groups of 8 from beginning)
-		binCommand[i] = payloadRead(seq, zero, one);                     // i.e. binCommand = '011001100101101010011001011001...'
+		binCommand[i] = payloadRead(seq, zero, one, maxGapInFrame);      // i.e. binCommand = '011001100101101010011001011001...'
 		seqCommand[i] = hexCommand(binCommand[i]);                       // i.e. seqCommand = '665a996695655596'
 
 		output += "* Sequence " + i + ': ';                              // Start of sequence output
@@ -733,6 +741,7 @@ function readRaw() {                                        // * Main Raw analys
 		setField('cCommandField', lastCommand);
 		setField('cShortField', lastShort);
 		setField('cGapField', gap); 
+		setField('cMaxGapInFrameField', maxGapInFrame);
 		setField('cHeaderField', header.join(', '));
 		setField('headerLength', headerLength);
 		setField('trailerLength', trailerLength);                           // 
@@ -983,7 +992,7 @@ function findFirstHeader(seq, zero, one, start) {                    // __Return
 	}
 	return -1;	
 }
-function locateSequences(dec, zero, one, firstHeaderPos, header) {   // _input raw decimals[], output array of pos[0,132,264] from header[]
+function locateSequences(dec, zero, one, firstHeaderPos, header, maxGapInFrame = 10000) {   // _input raw decimals[], output array of pos[0,132,264] from header[]
 
 	let index = 0;
 	let seqStart = [];                                           // seqStart will store Seq milestones positions, e.g. [0,132,264]
@@ -1005,14 +1014,20 @@ function locateSequences(dec, zero, one, firstHeaderPos, header) {   // _input r
 						i = i + header.length - 1;
 					}
 				}
+			} else if (tmp > maxGapInFrame) {                     // Gap detected
+				seqStart[index] = i + 1;
+				index ++;
 			}
 		}			                                             // At this stage, seqStart = e.g. [0,132,264],
 		seqStart[index] = i  			                         //  last element being the end marker
 	} else {			                                         // If function was called without an identified header,
 		seqStart[0] = firstHeaderPos;                            //  seqStart = e.g. {0, 264}
-		seqStart[1] = dec.length - 1 ;                           // 
+		for (i = firstHeaderPos; i < dec.length - 1; i++) {
+			if (dec[i] > maxGapInFrame) seqStart[++index] = i + 1;
+		}
+		seqStart[++index] = dec.length - 1 ;                     //
 	}
-	return seqStart;
+	return [...new Set(seqStart)].sort((a,b) => a - b);
 }
 function checkGap(str, highest) {                                    // _Returns it as string if last value in string is a possible Gap
 	if (str[str.length-1] == highest) {              // If very last value of string is equal to highest value
@@ -1023,7 +1038,7 @@ function checkGap(str, highest) {                                    // _Returns
 	}
 	return '';                                       // no Gap.
 }
-function payloadRead(seq, zero, one) {                               // _input: array of values, output string of binary values
+function payloadRead(seq, zero, one, maxGapInFrame = 10000) {         // _input: array of values, output string of binary values
 
 	let zeroCount = 0;
 	let oneCount = 0;
@@ -1039,6 +1054,8 @@ function payloadRead(seq, zero, one) {                               // _input: 
 		} else if (isClose(value, one)){
 			command += '1';
 			oneCount ++;
+		} else if (value > maxGapInFrame) {
+			break;                                               // End of sequence gap cleanly breaks
 		} else {
 			output += "\n Encountered out-of-range value: " + value + ' at step ' + i + ' in sequence:\n' + seq.join(', ') + '\n';
 			break;;
@@ -1073,6 +1090,7 @@ function isZeroOrOne(value, zero, one) {                             // __return
 function ui_headTrailReset(head, trail) {                             // Resets Header and Trailer length values in Raw Analysis form
 	setField('headerLength', head);
 	setField('trailerLength', trail);                           // 
+	setField('cMaxGapInFrameField', 10000);                            // Reset Max Gap in Frame
 }
 function checkPtrail(str, seqStart) {                                // * unused* Returns last value in string if a possible Ptrail, else false
 	let tmp = seqStart.length, flag = true;
