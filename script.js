@@ -56,7 +56,9 @@ function ui_clear(fieldId) {               // Clears field with id string fieldI
 		clrField('cZeroField');
 		clrField('cPtrailField');
 		clrField('cGapField');
+		clrField('cInterFrameGapField');
 		clrField('cMaxGapInFrameField');
+		document.getElementById('cHeaderlessOddField').checked = false;
 		clrField('cFreqField');
 		clrField('cShortField');
 		clrField('cCommandField');
@@ -145,6 +147,7 @@ function ui_presetValues() {			   // Prefills Command fields with most common IR
         "9000",         // Gap
         "",      	// Pre Data
 	"10000",	// Max Gap in Frame
+	"20000"		// Inter-Frame Gap
     ];
 
     document.getElementById('cHeaderField').value = presetValues[0];
@@ -154,6 +157,8 @@ function ui_presetValues() {			   // Prefills Command fields with most common IR
     document.getElementById('cGapField').value = presetValues[4];
     document.getElementById('cPreField').value = presetValues[5];
     document.getElementById('cMaxGapInFrameField').value = presetValues[6];
+    document.getElementById('cInterFrameGapField').value = presetValues[7];
+    document.getElementById('cHeaderlessOddField').checked = false;
 
     info("Preset values applied!");
 }
@@ -607,11 +612,24 @@ function readRaw() {                                        // * Main Raw analys
 	
 	let gap = checkGap(str, highest);                                 // Gets gap string or '' (gap being the closing long value)
 
+	let detectedInterFrameGaps = [];
+	for (let k = 1; k < seqStart.length - 1; k++) {
+		if (seqStart[k] > 0) detectedInterFrameGaps.push(str[seqStart[k] - 1]);
+	}
+	let interFrameGapString = detectedInterFrameGaps.slice(0, 2).join(', '); // Capture repeating inter-frame gap pattern
+
 	if (gap) {trailerLength = 1} else {trailerLength = 0};            // *** Replaces user-defined trailer length if a trailer has been identified or not ***
 
 	//let pTrail = checkPtrail(str, seqStart);                          // Gets pTrail string or '' ***** can hardly be sure of pTrail, so, first proposal here ***
 
 	let seqQty = seqStart.length - 1;                                 // Nombre de séquences
+	let isHeaderlessOdd = false;
+	if (header != -1 && seqQty > 1) {
+		if (!is(str[seqStart[1]], header[0])) {
+			isHeaderlessOdd = true;
+		}
+	}
+
 	let seq;
 	let binCommand = [];                                              // These will store the different burst values that will be found
 	let seqCommand = [];                                              //
@@ -746,7 +764,9 @@ function readRaw() {                                        // * Main Raw analys
 		setField('cCommandField', lastCommand);
 		setField('cShortField', lastShort);
 		setField('cGapField', gap); 
+		setField('cInterFrameGapField', interFrameGapString);
 		setField('cMaxGapInFrameField', maxGapInFrame);
+		document.getElementById('cHeaderlessOddField').checked = isHeaderlessOdd;
 		setField('cHeaderField', header.join(', '));
 		setField('headerLength', headerLength);
 		setField('trailerLength', trailerLength);                           // 
@@ -1145,9 +1165,10 @@ function buildRandom(hexLen, type) {               // Generates a random sequenc
 	let header = `${h1}, ${h2}`
 	let ptrail = 200 + getRandomInt(600);
 	let gap = v0 * 80 + getRandomInt(10000);
+	let interFrameGap = "20000, 40000";
 
-	output += `Header: ${header} One: ${one} Zero: ${zero} Ptrail: ${ptrail} Gap: ${gap} Bin command: ${bin}\n`
-	let raw = buildRaw(header,one,zero,ptrail.toString(),gap.toString(),bin);
+	output += `Header: ${header} One: ${one} Zero: ${zero} Ptrail: ${ptrail} Gap: ${gap} Inter-Frame Gap: ${interFrameGap} Bin command: ${bin}\n`
+	let raw = buildRaw(header,one,zero,ptrail.toString(),gap.toString(),interFrameGap,bin);
 
 	return {                                      // Returns an object - Sample values:
 		'raw': raw,                               // '8546, 4128, 526, 1604, 526, 552, 526, 1604, 526, 552, [...] 1604, 526, 1604, 526, 1604, 526, 25822'
@@ -1158,6 +1179,7 @@ function buildRandom(hexLen, type) {               // Generates a random sequenc
 		'zero': zero,                             // '522 547'
 		'ptrail': ptrail,                         // '522'
 		'gap': gap,                               // '25817'
+		'interFrameGap': interFrameGap            // '20000, 40000'
 	};
 }
 function getRandomInt(max) {
@@ -1623,6 +1645,8 @@ function convertCodes() {                             // ** Main- Converts all f
 	let zero = getField('cZeroField');
 	let ptrail = getField('cPtrailField');
 	let gap = getField('cGapField');
+	let interFrameGap = getField('cInterFrameGapField') || "20000";
+	let isHeaderlessOdd = document.getElementById('cHeaderlessOddField').checked;
 
 	let freq = getField('cFreqField');
 	
@@ -1633,7 +1657,7 @@ function convertCodes() {                             // ** Main- Converts all f
 	}
 	if (one && zero && lircCommand) {
 		let bin = hexTobin(lircCommand);		
-		let raw = buildRaw(header,one,zero,ptrail,gap,bin);
+		let raw = buildRaw(header,one,zero,ptrail,gap,interFrameGap,bin,isHeaderlessOdd);
 		setField('rawField', raw);		                        // Publish Raw without headers
 		if (freq) {
 			setField('freqFieldRaw', freq);                     // Temporarily fills Raw frequency field
@@ -2086,7 +2110,7 @@ function decToHex(str) {                        // Converts a decimal string to 
 	let hex = dec.map((e) => e.toString(16).padStart(4, "0"));
 	return hex.join(' ');
 }
-function buildRaw(header,one,zero,ptrail,gap,bin) {      // Generates Raw from Lirc command, returns command as string of decimals with ',' separators
+function buildRaw(header,one,zero,ptrail,gap,interFrameGaps,bin,isHeaderlessOdd = false) {      // Generates Raw from Lirc command, returns command as string of decimals with ',' separators
 
 	// Note that there's no frequency involved here yet, as the value themselves contain the time codes to be emitted  
 
@@ -2095,23 +2119,33 @@ function buildRaw(header,one,zero,ptrail,gap,bin) {      // Generates Raw from L
 	str[1] = cleanStringSeps(one, ',');                       // while cleaning separators in the three fields that have multiple values
 	header = cleanStringSeps(header, ',');                    //
 	
+	interFrameGaps = cleanStringSeps(interFrameGaps, ',').split(',');
+
 	let val0 = str[0].split(',')[0];                          // Base pulse timing
 	let val1 = str[1].split(',')[1] || val0;                  // Base long space timing
 
-	let parts = bin.split('/');
-	let necBits = parts[0];
-	let rawRem = parts[1] || "";
+	let frames = bin.split('+');
+	for (let f = 0; f < frames.length; f++) {
+		let parts = frames[f].split('/');
+		let necBits = parts[0];
+		let rawRem = parts[1] || "";
+		let emitHeader = isHeaderlessOdd ? (f % 2 === 0) : true;
 
-	if (header) {raw.push(header)};
-	for (let i = 0; i < necBits.length; i++) {
-		raw.push(str[parseInt(necBits.charAt(i))]);
-	}
-	if (rawRem) {
-		for (let i = 0; i < rawRem.length; i++) {
-			raw.push(rawRem.charAt(i) === '0' ? val0 : val1);
+		if (emitHeader && header) {raw.push(header)};
+		for (let i = 0; i < necBits.length; i++) {
+			raw.push(str[parseInt(necBits.charAt(i))]);
 		}
-	} else if (ptrail) {
-		raw.push(ptrail);
+		if (rawRem) {
+			for (let i = 0; i < rawRem.length; i++) {
+				raw.push(rawRem.charAt(i) === '0' ? val0 : val1);
+			}
+		} else if (ptrail) {
+			raw.push(ptrail);
+		}
+		if (f < frames.length - 1 && (rawRem || ptrail)) {
+			let interFrameGap = interFrameGaps[f % interFrameGaps.length] || interFrameGaps[0];
+			raw.push(interFrameGap);
+		}
 	}
 	if (gap) {raw.push(gap)};                       // Completes by pushing gap
 
@@ -2180,15 +2214,20 @@ function base64ToHex(str) {                              // _Converts Base 64 ==
 function hexTobin(hex) {                                 // Converts hex string to binary with 16 0-padding
 	//                                                                 Examples:
 	let bin = "";                                                   //  a5               -> 0000000010100101
-	let parts = hex.split('/');
-	let f = parts[0].replace(/[ \r\n+]/g, '');
-	let remainder = parts[1] ? parts[1].replace(/[ \r\n]/g, '') : "";
-	while (f.length) {
-		let tmphex = "0x" + f.slice(-4);
-		bin = parseInt(tmphex).toString(2).padStart(16, "0") + bin;
-		f = f.substring(0, f.length - 4);
+	let frames = hex.split('+');
+	for (let j = 0; j < frames.length; j++) {
+		let parts = frames[j].split('/');
+		let f = parts[0].replace(/[ \r\n]/g, '');
+		let remainder = parts[1] ? parts[1].replace(/[ \r\n]/g, '') : "";
+		let fbin = "";
+		while (f.length) {
+			let tmphex = "0x" + f.slice(-4);
+			fbin = parseInt(tmphex).toString(2).padStart(16, "0") + fbin;
+			f = f.substring(0, f.length - 4);
+		}
+		if (remainder) fbin += "/" + remainder; // Preserve the slash for buildRaw
+		bin += (j > 0 ? "+" : "") + fbin;
 	}
-	if (remainder) bin += "/" + remainder; // Preserve the slash for buildRaw
 	return bin;
 }
 function hexPairPad(val) {                               // Converts a decimal to hex, adding 0 padding to get paired representation
