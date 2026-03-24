@@ -196,6 +196,24 @@ Il ne reste plus qu'à entrer ces valeurs dans le panneau *Commands* de *Sensus*
 
 ![image](screenshots/sensusManual04.jpg)
 
+## Signaux multi-trames
+Certains signaux (par exemple ceux générés par les télécomandes de climatiseur ou de thermopompe) peuvent être très long et complexes. Ils utilisent plusieurs trames pour contenir la commande au complet.
+
+![image](screenshots/sensusManual05.jpg)
+
+Les signaux multi-trames sont gérés avec 4 champs:
+* Max Gap in Frame (Espace maximum dans une trame)
+* Gap(s) between Frames (Espace(s) entre les trames)
+* Headerless odd frames (checkbox) (Trames impaires sans entêtes [boîte à cocher])
+* Final Gap (Espace final)
+
+**Max Gap in Frame** ne fait pas réellement partie du signal. C'est simplement une configuration pour choisir la longueur minimal du silence qui sépare deux trames. Le défaut est de 10 ms (10 000 µs), mais peut être ajusté au besoin.
+
+Il y a deux type d'espaces différents:
+1. Le **Final Gap**. C'est le même que pour un signal incluant une seule trame: Il s'agit de l'espace à la fin du signal qui le sépare du signal suivant.
+2. Les Gap inter-trames (**Gap(s) between Frames**). Ces espaces sont entre les trames d'un même signal. Dans certains cas, l'espace entre les trames est toujours le même, mais parfois, c'est plus compliqué. La séquence d'espaces entre les trames peut être indiquée ici.
+
+**Headerless odd frames** (Trames impaires sans entêtes) contrôle quelles frames ont une entête. Certains signaux n'inclue une entête qu'une trame sur deux.
 
 **[Pasthev 2025](https://pasthev.github.io/)**
 
