@@ -146,19 +146,19 @@ The command is displayed, highlighted here in yellow: `7689 d02f`.
 
 * The **Zero** (in white) and the **One** (dark blue) have been calculated at their average values, respectively `550, 550`, and `550, 1727` (the second value for encoding the *One* is triple the first, this is again a common standard).
 
-* As long as a remote control button is held down, it sends the signal, but each time marking a pause between two: the "**Repeat Signal**", which is generally the same as the end-of-sequence signal, the "**Gap**". This one is often the sum value  of the entire signal. I have indicated the first *Repeat* in green, the second in light blue: `40362`, and `40332`. The value should rather be around 54004 here, but it doesn't matter: the essential is to send a long white, and the durations are expressed in μs - so we are talking here about a pause of 0.04 or 0.05 seconds.
-  * Sensus did not record this value as "**Gap**" in the top field: it is wary, because the *Gap* is expected at the end of the signal, but perhaps I should make it less wary, because we will later use this repeat value as *Gap*.
+* As long as a remote control button is held down, it sends the signal, but each time marking a pause between two: the "**Repeat Signal**", which is generally the same as the end-of-sequence signal, the "**Final Gap**". This one is often the sum value  of the entire signal. I have indicated the first *Repeat* in green, the second in light blue: `40362`, and `40332`. The value should rather be around 54004 here, but it doesn't matter: the essential is to send a long white, and the durations are expressed in μs - so we are talking here about a pause of 0.04 or 0.05 seconds.
+  * Sensus did not record this value as "**Final Gap**" in the top field: it is wary, because the *Final Gap* is expected at the end of the signal, but perhaps I should make it less wary, because we will later use this repeat value as *Final Gap*.
 
-* The "**Ptrail**" is a short "*half Zero*" sent after the command, just before the *Repeat* or *Gap*. It is used to indicate the unit length, and to make the value sequence even, to ensure that the Gap is interpreted as a silence. The Ptrail was not spotted here by Sensus, I don't know why - maybe because of the unfinished tail - but it will be in due time.
+* The "**Ptrail**" is a short "*half Zero*" sent after the command, just before the *Repeat* or *Final Gap*. It is used to indicate the unit length, and to make the value sequence even, to ensure that the Final Gap is interpreted as a silence. The Ptrail was not spotted here by Sensus, I don't know why - maybe because of the unfinished tail - but it will be in due time.
 
 
 ## Removing repetitions<a id="remove"></a>
 
-We have everything we need to either clean the sequence, or re-generate it from the values identified in the "**Commands**" panel - the missing values being `Ptrail: 550` (a half Zero), and `Gap: 40350` (or `54554`, which is the sum of the command values, excluding the *Ptrail*, if you want perfect balancing)
+We have everything we need to either clean the sequence, or re-generate it from the values identified in the "**Commands**" panel - the missing values being `Ptrail: 550` (a half Zero), and `Final Gap: 40350` (or `54554`, which is the sum of the command values, excluding the *Ptrail*, if you want perfect balancing)
 
 ### Cleaning:
 
-The method is simple. We start by removing from the Raw all the values after the first Repeat (which will conveniently become our end-of-sequence *Gap*). This leaves only the following sequence in the Raw field:
+The method is simple. We start by removing from the Raw all the values after the first Repeat (which will conveniently become our end-of-sequence *Final Gap*). This leaves only the following sequence in the Raw field:
 
 ```
 9041, 4524, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 602, 550, 550, 550, 550, 550, 1722, 550, 550, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 1722, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 1722, 550, 40362
@@ -169,10 +169,10 @@ The method is simple. We start by removing from the Raw all the values after the
 
 ![image](screenshots/sensusManual02.jpg)
 
-* Note that this time, the **Ptrail** and the **Gap** are identified: `550` and `40362`.
+* Note that this time, the **Ptrail** and the **Final Gap** are identified: `550` and `40362`.
 * As is, the signal has every chance of working, but note that in some standards requiring balancing, `40362` should be replaced by `54004`, which is the sum of the signal values. But since the value `40350` was recorded, it's best to keep it.
 
-Add this number manually in Raw, then click on "**Draw**": the signal is displayed, with its Gap, ready to be converted into the desired format.
+Add this number manually in Raw, then click on "**Draw**": the signal is displayed, with its Final Gap, ready to be converted into the desired format.
 
 
 

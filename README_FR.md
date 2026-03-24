@@ -33,19 +33,19 @@ La commande est affichée, surlignée ici en jaune : `7689 d02f`.
 
 * Le **Zéro** (en blanc) et le **Un** (Bleu foncé) ont été calculés à leurs valeurs moyennes, respectivement `550, 550`, et `550, 1727` (la deuxième valeur pour encoder le *Un* est le triple de la première, c'est là encore un standard courant).
 
-* Tant qu'on garde un bouton de télécommande appuyé, celle-ci renvoie le signal, mais en marquant chaque fois une pause entre deux, le "**Repeat Signal**", qui est en général le même que le signal de fin de séquence, le "**Gap**". Celui-ci vaut souvent la somme de la totalité du signal. J'ai ici indiqué le premier *Repeat* en vert, le second en bleu ciel : `40362`, et `40332`. La valeur devrait plutôt être autour des 54004 ici, mais peu importe : l'essentiel est d'envoyer un long blanc, et les durées sont exprimées en μs - on parle donc ici d'une pause de 0,04 ou 0,05 secondes.
-  * Sensus n'a pas enregistré cette valeur en tant que "**Gap**" dans le champ du haut : il se méfie, car le *Gap* est attendu en fin de signal, mais peut-être devrais-je le rendre moins méfiant, car on utilisera plus tard cette valeur de repeat en tant que *Gap*.
+* Tant qu'on garde un bouton de télécommande appuyé, celle-ci renvoie le signal, mais en marquant chaque fois une pause entre deux, le "**Repeat Signal**", qui est en général le même que le signal de fin de séquence, le "**Final Gap**". Celui-ci vaut souvent la somme de la totalité du signal. J'ai ici indiqué le premier *Repeat* en vert, le second en bleu ciel : `40362`, et `40332`. La valeur devrait plutôt être autour des 54004 ici, mais peu importe : l'essentiel est d'envoyer un long blanc, et les durées sont exprimées en μs - on parle donc ici d'une pause de 0,04 ou 0,05 secondes.
+  * Sensus n'a pas enregistré cette valeur en tant que "**Final Gap**" dans le champ du haut : il se méfie, car le *Final Gap* est attendu en fin de signal, mais peut-être devrais-je le rendre moins méfiant, car on utilisera plus tard cette valeur de repeat en tant que *Final Gap*.
 
-* Le "**Ptrail**" est un court "*demi Zéro*" envoyé après la commande, juste avant le *Repeat* ou le *Gap*. Il sert à indiquer la longueur d'unité, et à rendre paire la suite de valeur, pour s'assurer que le Gap soit interprété comme un silence. Le Ptrail n'a pas été ici repéré par Sensus, je ne sais pas pourquoi - peut-être à cause de la queue inachevée - , mais il le sera en temps utiles.
+* Le "**Ptrail**" est un court "*demi Zéro*" envoyé après la commande, juste avant le *Repeat* ou le *Final Gap*. Il sert à indiquer la longueur d'unité, et à rendre paire la suite de valeur, pour s'assurer que le Final Gap soit interprété comme un silence. Le Ptrail n'a pas été ici repéré par Sensus, je ne sais pas pourquoi - peut-être à cause de la queue inachevée - , mais il le sera en temps utiles.
 
 
 ## Supprimer les répétitions
 
-Nous avons tout ce qu'il nous faut pour, au choix, nettoyer la séquence, ou la re-générer à partir des valeurs identifiées dans le panneau "**Commands**" - les valeurs manquantes étant ``Ptrail : 550`` (un demi Zéro), et ``Gap : 40350`` (ou ``54554``, soit la somme des valeurs de la commande, dont on exclue le *Ptrail*, si l'on veut un équilibrage parfait)
+Nous avons tout ce qu'il nous faut pour, au choix, nettoyer la séquence, ou la re-générer à partir des valeurs identifiées dans le panneau "**Commands**" - les valeurs manquantes étant ``Ptrail : 550`` (un demi Zéro), et ``Final Gap : 40350`` (ou ``54554``, soit la somme des valeurs de la commande, dont on exclue le *Ptrail*, si l'on veut un équilibrage parfait)
 
 ### Nettoyage :
 
-La méthode est simple. On commence par supprimer du Raw toutes les valeurs après le premier Repeat (qui deviendra ainsi notre *Gap* de fin de séquence). Cela ne laisse dans le champ Raw que la séquence suivante :
+La méthode est simple. On commence par supprimer du Raw toutes les valeurs après le premier Repeat (qui deviendra ainsi notre *Final Gap* de fin de séquence). Cela ne laisse dans le champ Raw que la séquence suivante :
 
 ```
 9041, 4524, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 602, 550, 550, 550, 550, 550, 1722, 550, 550, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 550, 550, 1722, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 550, 1722, 550, 550, 550, 1722, 550, 1722, 550, 1722, 550, 1722, 550, 40362
@@ -55,10 +55,10 @@ Faites-le, puis cliquez de nouveau dans le panneau "**Raw Analysis**" sur "**Rea
 
 ![image](screenshots/sensusManual02.jpg)
 
-* Notez que cette fois, le **Ptrail** et le **Gap** sont identifiés : `550`et `40362`. 
+* Notez que cette fois, le **Ptrail** et le **Final Gap** sont identifiés : `550`et `40362`. 
 * Tel quel, le signal a toutes les chances de fonctionner, mais notez que dans certains standards imposant un équilibrage, `403622` devrait être remplacé par `54004`, soit la somme des valeurs du signal. Mais puisque c'est la valeur `40350`qui a été enregistrée, autant la conserver.
 
-Ajoutez ce chiffre à la main dans Raw, puis cliquez sur "**Draw**" : le signal s'affiche, avec son Gap, prêt à être converti dans le format désiré.
+Ajoutez ce chiffre à la main dans Raw, puis cliquez sur "**Draw**" : le signal s'affiche, avec son Final Gap, prêt à être converti dans le format désiré.
 
 ## Interlude : histoires de bits
 Avant de voir l'autre méthode de nettoyage, un coup d'oeil à Raw Analysis. En défilant tout en bas de l'analyse, on peut voir ces valeurs :
